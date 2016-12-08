@@ -14,10 +14,31 @@ double* init_jacobi(int N)
 	return J;
 }
 
+void exchangeBorders()
+{
+
+}
+void calculateJacobi()
+{
+
+}
+
+//TODO: REPLACE WITH BOOL
+int isJcobiSteady(int steady_tester_value, int steady_tester_process) {
+	// 0 means steady
+	if (steady_tester_process == 1 && steady_tester_value > 2500000) {
+		return 0;
+	}
+	else if (steady_tester_process == 1) {
+		return 1;
+	}
+	return 0;
+}
+
 
 int main()
 {
-	int N = 5;
+	int N = 6;
 	int rows_per_process;
 	int elems_per_process;
 
@@ -26,7 +47,6 @@ int main()
 	int sum = 0;
 	int last_rows;
 	double* subJ;
-
 
 
 	MPI_Init(NULL, NULL);
@@ -44,16 +64,12 @@ int main()
 	displs = new int[world_size];
 
 	//calculate send counts and displacements
-	// int max_sendcount = 0;
 	for (int i = 0; i < world_size; i++) {
 			sendcounts[i] = N*rows_per_process;
 			if (last_rows > 0) {
 					sendcounts[i] += N;
 					last_rows--;
 			}
-			// if (sendcounts[i] > max_sendcount) {
-			// 	max_sendcount = sendcounts[i];
-			// }
 
 			displs[i] = sum;
 			sum += sendcounts[i];
@@ -70,14 +86,30 @@ int main()
 
 
 	double* J = NULL;
+	int success_steady_root_check;
 	if (world_rank == 0) {
 			J = init_jacobi(N);
+			success_steady_root_check = 0;
 	}
+
 	MPI_Scatterv(J, sendcounts, displs, MPI_DOUBLE, subJ, sendcounts[world_size], MPI_DOUBLE, 0, MPI_COMM_WORLD);
-	std::cout << "S:\n";
-	for (int i=0; i<sendcounts[world_rank]; i++) {
-		std::cout << subJ[i] << " ";
-	}
+	int must_continue = 1;
+	int is_steady;
+	int steady_tester = 0;
+
+	do {
+		exchangeBorders();
+		calculateJacobi();
+		is_steady = isJcobiSteady(steady_tester, world_rank);
+		// MPI_Barrier(MPI_COMM_WORLD);
+		steady_tester++;
+		MPI_Reduce(&is_steady, &success_steady_root_check, 1, MPI_INT, MPI_SUM, 0, MPI_COMM_WORLD);
+		if (world_rank == 0 && success_steady_root_check == 0) {
+			must_continue = 0;
+		}
+		MPI_Bcast(&must_continue, 1, MPI_INT, 0, MPI_COMM_WORLD);
+	} while (must_continue);
+
 
 	double* final_J = NULL;
 	if (world_rank == 0) {

@@ -7,6 +7,7 @@
 double* init_jacobi(int N)
 {
 	double* J = new double[N*N];
+	std::cout << "Initial matrix\n";
 	for (int i=0; i<N*N; i++) {
 			J[i] = i / N;
 			std::cout << J[i] << " ";
@@ -27,25 +28,16 @@ void calculateJacobi()
 
 //TODO: REPLACE WITH BOOL
 int isJcobiSteady(int steady_tester_value, int steady_tester_process) {
-	// 0 means steady
-	if (steady_tester_process == 1 && steady_tester_value > -1) {
-		return 0;
-	}
-	else if (steady_tester_process == 1) {
-		return 1;
-	}
-	return 0;
+	return 0; // 0 means steady
 }
 
 
 int main()
 {
-	int N;
-	std::cin >> N;
-	int max_iter;
-	std::cin >> max_iter;
-	int epsila;
-	std::cin >> epsila;
+	int N = 5;
+	int max_iter = 1;
+	int epsila = 1;
+
 	int initial_parameters[3] = {N, max_iter, epsila};
 
 	int rows_per_process;
@@ -120,6 +112,7 @@ int main()
 	int skip = sendcounts[world_rank] - N; // for borders exchange
 
 	do {
+		// exchange borders
 		if (world_rank % 2 == 0) {
 			for (int i=0; i<N; i++) {
 					exchange_buffer_one[i] = subJ[i+skip];
@@ -129,7 +122,6 @@ int main()
 			}
 			if (world_rank == 0) { //send and receive once for first subJ
 				MPI_Send(exchange_buffer_one, N, MPI_DOUBLE, world_rank+1, 0, MPI_COMM_WORLD);
-				MPI_Barrier(MPI_COMM_WORLD);
 				MPI_Recv(exchange_buffer_two, N, MPI_DOUBLE, world_rank+1, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
 				for (int i=0; i<N; i++) {
 						subJ[i+skip] = exchange_buffer_two[i];
@@ -162,7 +154,6 @@ int main()
 			}
 
 			MPI_Send(exchange_buffer_two, N, MPI_DOUBLE, world_rank-1, 0, MPI_COMM_WORLD);
-			MPI_Barrier(MPI_COMM_WORLD);
 			MPI_Recv(exchange_buffer_one, N, MPI_DOUBLE, world_rank-1, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
 			for (int i=0; i<N; i++) {
 					subJ[i] = exchange_buffer_one[i];
@@ -178,7 +169,6 @@ int main()
 
 		calculateJacobi();
 		is_steady = isJcobiSteady(steady_tester, world_rank);
-		// MPI_Barrier(MPI_COMM_WORLD);
 		steady_tester++;
 		MPI_Reduce(&is_steady, &success_steady_root_check, 1, MPI_INT, MPI_SUM, 0, MPI_COMM_WORLD);
 		if (world_rank == 0 && success_steady_root_check == 0) {
@@ -195,6 +185,7 @@ int main()
 	MPI_Gatherv(subJ, sendcounts[world_rank], MPI_DOUBLE, final_J, sendcounts, displs, MPI_DOUBLE, 0, MPI_COMM_WORLD);
 	std::cout << "\n";
 	if (world_rank == 0) {
+		std::cout << "Final matrix after exhcange\n";
 		for (int i=0; i<N*N; i++) {
 			std::cout << final_J[i] << " ";
 		}

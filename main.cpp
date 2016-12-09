@@ -1,4 +1,5 @@
 #include <iostream>
+#include <stdio.h>
 #include <stdlib.h>
 #include <mpi.h>
 
@@ -18,6 +19,7 @@ void exchangeBorders()
 {
 
 }
+
 void calculateJacobi()
 {
 
@@ -26,7 +28,7 @@ void calculateJacobi()
 //TODO: REPLACE WITH BOOL
 int isJcobiSteady(int steady_tester_value, int steady_tester_process) {
 	// 0 means steady
-	if (steady_tester_process == 1 && steady_tester_value > 2500000) {
+	if (steady_tester_process == 1 && steady_tester_value > -1) {
 		return 0;
 	}
 	else if (steady_tester_process == 1) {
@@ -38,7 +40,14 @@ int isJcobiSteady(int steady_tester_value, int steady_tester_process) {
 
 int main()
 {
-	int N = 6;
+	int N;
+	std::cin >> N;
+	int max_iter;
+	std::cin >> max_iter;
+	int epsila;
+	std::cin >> epsila;
+	int initial_parameters[3] = {N, max_iter, epsila};
+
 	int rows_per_process;
 	int elems_per_process;
 
@@ -46,24 +55,34 @@ int main()
 	int* displs;
 	int sum = 0;
 	int last_rows;
+
 	double* subJ;
+	double* exchange_buffer_one;
+	double* exchange_buffer_two;
+	double* exchange_buffer_three;
+	double* exchange_buffer_four;
 
 
 	MPI_Init(NULL, NULL);
-
+	MPI_Barrier(MPI_COMM_WORLD);
 	int world_size;
 	MPI_Comm_size(MPI_COMM_WORLD, &world_size);
 	int world_rank;
 	MPI_Comm_rank(MPI_COMM_WORLD, &world_rank);
 
-	elems_per_process = (N * N) / world_size;
+
+	MPI_Bcast(&initial_parameters, 3, MPI_INT, 0, MPI_COMM_WORLD);
+	N = initial_parameters[0];
+	max_iter = initial_parameters[1];
+	epsila = initial_parameters[2];
+
 	rows_per_process = N / world_size;
 	last_rows = N % world_size;
 
 	sendcounts = new int[world_size];
 	displs = new int[world_size];
 
-	//calculate send counts and displacements
+	//calculate send counts and displacements for the main matrix splitting
 	for (int i = 0; i < world_size; i++) {
 			sendcounts[i] = N*rows_per_process;
 			if (last_rows > 0) {
@@ -77,13 +96,15 @@ int main()
 
 	if (0 == world_rank) {
 			for (int i = 0; i < world_size; i++) {
-					printf("sendcounts[%d] = %d\tdispls[%d] = %d\n", i, sendcounts[i], i, displs[i]);
+					printf("sendcounts[%d] = %d\trows[%d] = %d\n", i, sendcounts[i], i, sendcounts[i]/N);
 			}
 	}
 
-	subJ = new double[sendcounts[world_size]];
-
-
+	subJ = new double[sendcounts[world_rank]];
+	exchange_buffer_one = new double[N];
+	exchange_buffer_two = new double[N];
+	exchange_buffer_three = new double[N];
+	exchange_buffer_four = new double[N];
 
 	double* J = NULL;
 	int success_steady_root_check;
@@ -92,13 +113,69 @@ int main()
 			success_steady_root_check = 0;
 	}
 
-	MPI_Scatterv(J, sendcounts, displs, MPI_DOUBLE, subJ, sendcounts[world_size], MPI_DOUBLE, 0, MPI_COMM_WORLD);
+	MPI_Scatterv(J, sendcounts, displs, MPI_DOUBLE, subJ, sendcounts[world_rank], MPI_DOUBLE, 0, MPI_COMM_WORLD);
 	int must_continue = 1;
 	int is_steady;
 	int steady_tester = 0;
+	int skip = sendcounts[world_rank] - N; // for borders exchange
 
 	do {
-		exchangeBorders();
+		if (world_rank % 2 == 0) {
+			for (int i=0; i<N; i++) {
+					exchange_buffer_one[i] = subJ[i+skip];
+					exchange_buffer_two[i] = subJ[i+skip];
+					exchange_buffer_three[i] = subJ[i];
+					exchange_buffer_four[i] = subJ[i];
+			}
+			if (world_rank == 0) { //send and receive once for first subJ
+				MPI_Send(exchange_buffer_one, N, MPI_DOUBLE, world_rank+1, 0, MPI_COMM_WORLD);
+				MPI_Barrier(MPI_COMM_WORLD);
+				MPI_Recv(exchange_buffer_two, N, MPI_DOUBLE, world_rank+1, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+				for (int i=0; i<N; i++) {
+						subJ[i+skip] = exchange_buffer_two[i];
+				}
+			}
+			else if (world_rank == world_size-1) {//send and receive once for last subJ
+				MPI_Send(exchange_buffer_four, N, MPI_DOUBLE, world_rank-1, 0, MPI_COMM_WORLD);
+				MPI_Recv(exchange_buffer_three, N, MPI_DOUBLE, world_rank-1, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+				for (int i=0; i<N; i++) {
+						subJ[i] = exchange_buffer_three[i];
+				}
+			}
+			else { //send and receive twice
+				MPI_Send(exchange_buffer_four, N, MPI_DOUBLE, world_rank-1, 0, MPI_COMM_WORLD);
+				MPI_Recv(exchange_buffer_three, N, MPI_DOUBLE, world_rank-1, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+				MPI_Send(exchange_buffer_one, N, MPI_DOUBLE, world_rank+1, 0, MPI_COMM_WORLD);
+				MPI_Recv(exchange_buffer_two, N, MPI_DOUBLE, world_rank+1, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+				for (int i=0; i<N; i++) {
+						subJ[i] = exchange_buffer_three[i];
+						subJ[i+skip] = exchange_buffer_two[i];
+				}
+			}
+		}
+		else if (world_rank % 2 != 0 ) {
+			for (int i=0; i<N; i++) {
+					exchange_buffer_one[i] = subJ[i];
+					exchange_buffer_two[i] = subJ[i];
+					exchange_buffer_three[i] = subJ[i+skip];
+					exchange_buffer_four[i] = subJ[i+skip];
+			}
+
+			MPI_Send(exchange_buffer_two, N, MPI_DOUBLE, world_rank-1, 0, MPI_COMM_WORLD);
+			MPI_Barrier(MPI_COMM_WORLD);
+			MPI_Recv(exchange_buffer_one, N, MPI_DOUBLE, world_rank-1, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+			for (int i=0; i<N; i++) {
+					subJ[i] = exchange_buffer_one[i];
+			}
+			if (world_rank != world_size-1) {
+				MPI_Send(exchange_buffer_three, N, MPI_DOUBLE, world_rank+1, 0, MPI_COMM_WORLD);
+				MPI_Recv(exchange_buffer_four, N, MPI_DOUBLE, world_rank+1, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+				for (int i=0; i<N; i++) {
+						subJ[i+skip] = exchange_buffer_four[i];
+				}
+			}
+		}
+
 		calculateJacobi();
 		is_steady = isJcobiSteady(steady_tester, world_rank);
 		// MPI_Barrier(MPI_COMM_WORLD);
@@ -129,6 +206,8 @@ int main()
 		delete[] final_J;
 	}
 	delete[] sendcounts;	delete[] displs; delete[] subJ;
+	delete[] exchange_buffer_one;  delete[] exchange_buffer_two;
+	delete[] exchange_buffer_three; delete[] exchange_buffer_four;
 
 	MPI_Finalize();
 

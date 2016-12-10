@@ -1,6 +1,7 @@
 #include <cstdlib>
 #include <iostream>
 #include <fstream>
+#include <iomanip>
 #include <cmath>
 #include <mpi.h>
 
@@ -59,7 +60,7 @@ void transform_1d_to_2d(double* matrix_1d, double** matrix_2d, int row_size, int
 double* createAndInit(int row_size, int column_size, double init_value)
 {
   //This must be 1d-array
-  //TODO: replace with a 1d normal initialization
+  //TODO: replace with a 1d initialization
   double* J = create_1d_matrix(row_size*column_size);
   for (int i=0; i<row_size*column_size; i++) {
     J[i] = init_value;
@@ -79,7 +80,7 @@ void calculateJacobi(double** current_J, double** next_J, int row_size, int colu
   for (int row = 1; row < row_size-1; row++)
 	{
 		for (int column = 1; column < column_size-1; column++) {
-			current_J[row][column] = (next_J[row - 1][column] + next_J[row][column - 1] + next_J[row + 1][column] + next_J[row][column + 1]) / 4;
+			next_J[row][column] = (current_J[row - 1][column] + current_J[row][column - 1] + current_J[row + 1][column] + current_J[row][column + 1]) / 4;
 		}
 	}
 
@@ -101,22 +102,21 @@ int jacobiIsSteady(double** current_J, double** next_J, int row_size, int column
 }
 
 
-// void outputJacobi(double** J, int N) {
-// 	N += 2;
-//
-// 	for (int row = 0; row < N; row++)
-// 	{
-// 		for (int column = 0; column < N; column++)
-// 			if (column == 0)
-// 				cout << left << setw(10) << setprecision(5) << J[row][column];
-// 			else if (column == N - 1)
-// 				cout << left << setprecision(5) << J[row][column];
-// 			else
-// 				cout << left << setw(10) << setprecision(5) << J[row][column];
-// 		cout << endl;
-// 	}
-// 	cout << endl;
-// }
+void outputJacobi(double** J, int row_size, int column_size) {
+
+	for (int row = 0; row < row_size; row++)
+	{
+		for (int column = 0; column < column_size; column++)
+			if (column == 0)
+				cout << left << setw(10) << setprecision(5) << J[row][column];
+			else if (column == column_size - 1)
+				cout << left << setprecision(5) << J[row][column];
+			else
+				cout << left << setw(10) << setprecision(5) << J[row][column];
+		cout << endl;
+	}
+	cout << endl;
+}
 // void fileOutputJacobi(char* name, double** J, int N) {
 // 	ofstream outputFile;
 // 	outputFile.open(filename, ios::app);
@@ -297,10 +297,15 @@ int main()
     //   }
     // }
 
-    if (current_iter % 2 == 0) //TODO current_iter needs replacement???
-			calculateJacobi(current_J, next_J, row_size, column_size);
-		else
-			calculateJacobi(next_J, current_J, row_size, column_size);
+    if (current_iter % 2 == 0) {//TODO current_iter needs replacement???
+      calculateJacobi(current_J, next_J, row_size, column_size);
+      outputJacobi(next_J,row_size, column_size );
+    }
+		else {
+      calculateJacobi(next_J, current_J, row_size, column_size);
+      outputJacobi(current_J,row_size, column_size );
+    }
+
 
 		is_steady = jacobiIsSteady(current_J, next_J, row_size, column_size, epsila);
     std::cout << is_steady << "\n";

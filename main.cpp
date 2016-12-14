@@ -16,79 +16,133 @@ int iterations = 0;
 
 double* create_1d_matrix(int size)
 {
-  double* J = new double[size^2];
+	double* J = new double[size];
 
-  return J;
+	return J;
 }
+
 double** create_2d_matrix(int row_size, int column_size)
 {
-  double** J = new double*[row_size];
-  for (int i=0; i<row_size; i++) {
-    J[i] = new double[column_size];
-  }
+	double** J = new double*[row_size];
+	for (int i = 0; i < row_size; i++) {
+		J[i] = new double[column_size];
+	}
 
-  return J;
+	return J;
 }
+
 void delete_1d_matrix(double* J)
 {
-  delete[] J;
+	delete[] J;
 
-  return;
+	return;
 }
+
 void delete_2d_matrix(double** J, int row_size)
 {
-  for (int i=0; i<row_size; i++)
-    delete[] J[i];
+	for (int i = 0; i < row_size; i++)
+		delete[] J[i];
 
-  return;
+	return;
 }
+
 void transform_1d_to_2d(double* matrix_1d, double** matrix_2d, int row_size, int column_size)
 {
-  int column_index = 0;
-  for (int i=0; i<row_size*column_size; i++) {
-    matrix_2d[i/column_size][column_index] = matrix_1d[i];
-    column_index++;
+	int row_index = 0, column_index = 0;
+	//cout << "Size: " << row_size * column_size << endl;
+	for (int i = 0; i < row_size * column_size; i++) {
+		matrix_2d[row_index][column_index] = matrix_1d[i];
+		column_index++;
 
-    if (column_index == column_size)
-      column_index = 0;
-  }
+		if (column_index == column_size)
+		{
+			row_index++;
+			column_index = 0;
+		}
+	}
 
-  return;
+	return;
 }
 
+void transform_2d_to_1d(double** matrix_2d, double* matrix_1d, int row_size, int column_size)
+{
+	int index = 0;
+	for(int i = 0; i < row_size; i++)
+		for(int j = 0; j < column_size; j++)
+		{
+			matrix_1d[index] = matrix_2d[i][j];
+			index++;
+		}
+
+	return;
+}
 
 double* createAndInit(int row_size, int column_size, double init_value)
 {
   //This must be 1d-array
-  //TODO: replace with a 1d initialization
-  double* J = create_1d_matrix(row_size*column_size);
-  for (int i=0; i<row_size*column_size; i++) {
-    J[i] = init_value;
-  }
+	double* J = create_1d_matrix(row_size * column_size);
 
-  return  J;
+
+	int index = 0;
+
+	for(int i = 0; i < row_size; i++)
+	{
+		if (i == 0) //the upper border
+		{
+			for(int j = 0; j < row_size; j++)
+			{
+				J[index] = init_value;
+				index++;
+			}
+		}
+		else if(i == row_size - 1) //the lower border
+		{
+			for(int j = 0; j < row_size; j++)
+			{
+				J[index] = init_value;
+				index++;
+			}
+		}
+		else
+		{
+			J[index] = init_value;
+			index++;
+			for(int j = 0; j < row_size - 2; j++)
+			{
+				J[index] = 0;
+				index++;
+			}
+			J[index] = init_value;
+			index++;
+		}
+	}
+
+	return  J;
 }
+
 double** createAndInitSub(double* sub_J_1d, int row_size, int column_size)
 {
-  double** sub_J_2d = create_2d_matrix(row_size, column_size);
-  transform_1d_to_2d(sub_J_1d, sub_J_2d, row_size, column_size);
+	double** sub_J_2d = create_2d_matrix(row_size, column_size);
+	transform_1d_to_2d(sub_J_1d, sub_J_2d, row_size, column_size);
 
-  return sub_J_2d;
+	return sub_J_2d;
 }
+
 void calculateJacobi(double** current_J, double** next_J, int row_size, int column_size) //TODO next_J and curren_J: chagne places???
 {
-  for (int row = 1; row < row_size-1; row++)
+	for (int row = 1; row < row_size-1; row++)
 	{
 		for (int column = 1; column < column_size-1; column++) {
 			next_J[row][column] = (current_J[row - 1][column] + current_J[row][column - 1] + current_J[row + 1][column] + current_J[row][column + 1]) / 4;
 		}
 	}
 
-  return;
+	return;
 }
+
 int jacobiIsSteady(double** current_J, double** next_J, int row_size, int column_size, double epsila)
 {
-  for (int row = 1; row < row_size - 1; row++)
+	for (int row = 1; row < row_size - 1; row++)
 	{
 		for (int column = 1; column < column_size - 1; column++) {
 			double A = ceil(10000 * current_J[row][column]) / 10000.0;
@@ -97,13 +151,11 @@ int jacobiIsSteady(double** current_J, double** next_J, int row_size, int column
 				return 1;
 		}
 	}
-
 	return 0;
 }
 
-
-void outputJacobi(double** J, int row_size, int column_size) {
-
+void outputJacobi(double** J, int row_size, int column_size)
+{
 	for (int row = 0; row < row_size; row++)
 	{
 		for (int column = 0; column < column_size; column++)
@@ -117,6 +169,7 @@ void outputJacobi(double** J, int row_size, int column_size) {
 	}
 	cout << endl;
 }
+
 // void fileOutputJacobi(char* name, double** J, int N) {
 // 	ofstream outputFile;
 // 	outputFile.open(filename, ios::app);
@@ -141,7 +194,6 @@ void outputJacobi(double** J, int row_size, int column_size) {
 // 	outputFile.close();
 // }
 
-
 int main()
 {
 	//remove(filename);
@@ -159,12 +211,12 @@ int main()
 	// std::cin >> init_value;
 	//auto t_1 = std::chrono::high_resolution_clock::now();
 
-  int N = 4;
+	int N = 4;
 	int n_iters = 10;
-  double init_value = 1.0;
-	double epsila = 0.001;
+	double init_value = 1.0;
+	double epsila = 0.01;
 	int init_int_params[2] = {N, n_iters};
-  double init_double_params[2] = {init_value, epsila};
+	double init_double_params[2] = {init_value, epsila};
 
 	int rows_per_process;
 
@@ -172,76 +224,72 @@ int main()
 	int* displs;
 	int sum = 0;
 	int last_rows;
-
 	double* sub_J;
 	double* exchange_buffer_one;
-  double* exchange_buffer_two;
-  double* exchange_buffer_three;
+	double* exchange_buffer_two;
+	double* exchange_buffer_three;
 	double* exchange_buffer_four;
 
+	MPI_Init(NULL, NULL);
 
-  MPI_Init(NULL, NULL);
-
-  int world_size;
+	int world_size;
 	MPI_Comm_size(MPI_COMM_WORLD, &world_size);
 	int world_rank;
 	MPI_Comm_rank(MPI_COMM_WORLD, &world_rank);
 
-  MPI_Bcast(&init_int_params, 2, MPI_INT, 0, MPI_COMM_WORLD);
-  MPI_Bcast(&init_double_params, 2, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+	MPI_Bcast(&init_int_params, 2, MPI_INT, 0, MPI_COMM_WORLD);
+	MPI_Bcast(&init_double_params, 2, MPI_DOUBLE, 0, MPI_COMM_WORLD);
   //TODO separate function for init params
-  N = init_int_params[0];
-  n_iters = init_int_params[1];
-  init_value = init_double_params[0];
-  epsila = init_double_params[1];
+	N = init_int_params[0];
+	n_iters = init_int_params[1];
+	init_value = init_double_params[0];
+	epsila = init_double_params[1];
 
-  rows_per_process = N / world_size;
-  last_rows = N % world_size;
-
+	rows_per_process = N / world_size;
+	last_rows = N % world_size;
 
   //TODO separate function
-  sendcounts = new int[world_size];
-  displs = new int[world_size];
+	sendcounts = new int[world_size];
+	displs = new int[world_size];
   // calculate send counts and displacements for the main matrix splitting
-  for (int i = 0; i < world_size; i++) {
-      sendcounts[i] = (rows_per_process+1)*(N+2);
-      if (last_rows > 0) {
-          sendcounts[i] += N;
-          last_rows--;
-      }
+	for (int i = 0; i < world_size; i++) {
+		sendcounts[i] = (rows_per_process + 1) * (N + 2);
+		if (last_rows > 0) {
+			sendcounts[i] += N;
+			last_rows--;
+		}
 
-      displs[i] = sum;
-      sum += sendcounts[i];
-  }
+		displs[i] = sum;
+		sum += sendcounts[i];
+	}
+
+	sub_J = new double[sendcounts[world_rank]];
+	exchange_buffer_one = new double[N];
+	exchange_buffer_two = new double[N];
+	exchange_buffer_three = new double[N];
+	exchange_buffer_four = new double[N];
 
 
-  sub_J = new double[sendcounts[world_rank]];
-  exchange_buffer_one = new double[N];
-  exchange_buffer_two = new double[N];
-  exchange_buffer_three = new double[N];
-  exchange_buffer_four = new double[N];
+	  double* J = NULL;
+  	int success_steady_root_check; // 1 for true, 0 for false
+  	int current_iter = 0;
 
+  	if (world_rank == 0) {
+  		J = createAndInit(N + 2, N + 2, 1);
+  		success_steady_root_check = 0;
+  	}
 
-  double* J = NULL;
-  int success_steady_root_check; // 1 for true, 0 for false
-  int current_iter = 0;
+  	MPI_Scatterv(J, sendcounts, displs, MPI_DOUBLE, sub_J, sendcounts[world_rank], MPI_DOUBLE, 0, MPI_COMM_WORLD);
+  	int must_continue = 1;
+  	int is_steady; // 0 means steady
+  	int skip = sendcounts[world_rank] - N; // for borders exchange
+  	int row_size = sendcounts[world_rank] / (N + 2);
+  	int column_size = N + 2;
 
-  if (world_rank == 0) {
-      J = createAndInit(N+2, N+2, 1);
-      success_steady_root_check = 0;
-  }
+  	double** current_J = createAndInitSub(sub_J, row_size, column_size); //for two processes!
+  	double** next_J = createAndInitSub(sub_J, row_size, column_size); //for two processes!
 
-  MPI_Scatterv(J, sendcounts, displs, MPI_DOUBLE, sub_J, sendcounts[world_rank], MPI_DOUBLE, 0, MPI_COMM_WORLD);
-  int must_continue = 1;
-  int is_steady; // 0 means steady
-  int skip = sendcounts[world_rank] - N; // for borders exchange
-  int row_size = sendcounts[world_rank] / (N+2);
-  int column_size = N+2;
-
-  double** current_J = createAndInitSub(sub_J, row_size, column_size);
-  double** next_J = createAndInitSub(sub_J, row_size, column_size);
-
-  do {
+  	do {
     // exchange borders
     // if (world_rank % 2 == 0) {
     //   for (int i=0; i<N; i++) {
@@ -297,32 +345,51 @@ int main()
     //   }
     // }
 
-    if (current_iter % 2 == 0) {//TODO current_iter needs replacement???
-      calculateJacobi(current_J, next_J, row_size, column_size);
-      outputJacobi(next_J,row_size, column_size );
-    }
-		else {
-      calculateJacobi(next_J, current_J, row_size, column_size);
-      outputJacobi(current_J,row_size, column_size );
-    }
+      //TODO Deal with row size
+    	if (current_iter % 2 == 0) {
+    		calculateJacobi(current_J, next_J, row_size, column_size);
+    		// outputJacobi(next_J,row_size, column_size );
+    	}
+    	else {
+    		calculateJacobi(next_J, current_J, row_size, column_size);
+    		// outputJacobi(current_J,row_size, column_size);
+    	}
 
+    	is_steady = jacobiIsSteady(current_J, next_J, row_size, column_size, epsila);
 
-		is_steady = jacobiIsSteady(current_J, next_J, row_size, column_size, epsila);
-    std::cout << is_steady << "\n";
+    	MPI_Reduce(&is_steady, &success_steady_root_check, 1, MPI_INT, MPI_SUM, 0, MPI_COMM_WORLD);
+    	current_iter++;
+    	if (world_rank == 0 && (success_steady_root_check == 0 || current_iter == n_iters)) {
+    		must_continue = 0;
+    	}
 
+    	MPI_Bcast(&must_continue, 1, MPI_INT, 0, MPI_COMM_WORLD);
+	} while (must_continue);
 
-    MPI_Reduce(&is_steady, &success_steady_root_check, 1, MPI_INT, MPI_SUM, 0, MPI_COMM_WORLD);
-    current_iter++;
-    if (world_rank == 0 && (success_steady_root_check == 0 || current_iter == n_iters)) {
-      must_continue = 0;
-    }
-    MPI_Bcast(&must_continue, 1, MPI_INT, 0, MPI_COMM_WORLD);
-  } while (must_continue);
+  double* final_sub = create_1d_matrix(row_size*column_size); //for two processes!
+  if (current_iter % 2 == 0) {
+    transform_2d_to_1d(next_J, final_sub, row_size, column_size); //+1 for two processes only!
+  }
+  else {
+    transform_2d_to_1d(current_J, final_sub, row_size, column_size); //+1 for two processes only!
+  }
 
-  if (world_rank == 0)
-    std::cout << "Number of iterations: " << current_iter << "\n";
+  double* final_J = NULL;
+  if (world_rank == 0) {
+    final_J = create_1d_matrix((N+2)*(N+2));
+  }
 
-  MPI_Finalize();
+  MPI_Gatherv(final_sub, sendcounts[world_rank], MPI_DOUBLE, final_J, sendcounts, displs, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+
+  double** result = NULL;
+  if (world_rank == 0) {
+    result = create_2d_matrix(N+2, N+2);
+    transform_1d_to_2d(final_J, result, N+2, N+2);
+    outputJacobi(result, N+2, N+2);
+    std::cout << "Iterations: " << current_iter << "\n";
+  }
+
+	MPI_Finalize();
 	//cout << "Number of iterations: " << iterations << endl;
 	//auto t_2 = std::chrono::high_resolution_clock::now();
 	//std::cout << "Total time: " << std::chrono::duration<double, std::milli>(t_2 - t_1).count() << " ms " << std::endl;

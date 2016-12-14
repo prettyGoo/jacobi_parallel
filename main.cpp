@@ -120,16 +120,52 @@ double* createAndInit(int row_size, int column_size, double init_value)
 	return  J;
 }
 
-double** createAndInitSub(double* sub_J_1d, int row_size, int column_size)
+double** createAndInitSub(double* sub_J_1d, int row_size, int column_size, extra_row_param)
 {
-	double** sub_J_2d = create_2d_matrix(row_size, column_size);
+  int rows;
+  if (extra_row_param == -1 || extra_row_param == 1) {
+    double** sub_J = create_2d_matrix(row_size+1, column_size);
+    rows = row_size + 1;
+  }
+  else if (extra_row_param == 0){
+    double** sub_J = create_2d_matrix(row_size+2, column_size);
+    rows = row_size + 2;
+  }
+
+
+  double** sub_J_2d = create_2d_matrix(row_size, column_size);
 	transform_1d_to_2d(sub_J_1d, sub_J_2d, row_size, column_size);
 
-	return sub_J_2d;
+  int sub_i=0; int sub_j=0;
+  for (int i=0; i<rows; i++) {
+    if (sub_j == column_size-1) {
+      sub_i++;
+      sub_j = 0;
+    }
+    for (int j=0; j<column_size; j++) {
+      if (i==0 && (extra_row_param==1 || extra_row_param=0)) {
+        sub_J[i][j] = 0; // just nothins for now
+      }
+      else if (i==rows-1 && (extra_row_param==-1 || extra_row_param==0)) {
+        sub_J[i][j] = 0; // just nothing for now
+      }
+      else {
+        sub_J = sub_J_2[i][j];
+        sub_j++;
+      }
+    }
+  }
+
+	return sub_J;
 }
 
-void calculateJacobi(double** current_J, double** next_J, int row_size, int column_size) //TODO next_J and curren_J: chagne places???
+void calculateJacobi(double** current_J, double** next_J, int row_size, int column_size, int extra_row_param)
 {
+  if (extra_row_param == -1 || extra_row_param == 1)
+    row_size +=1;
+  else if (extra_row_param == 0)
+    row_size +=2;
+
 	for (int row = 1; row < row_size-1; row++)
 	{
 		for (int column = 1; column < column_size-1; column++) {
@@ -140,8 +176,13 @@ void calculateJacobi(double** current_J, double** next_J, int row_size, int colu
 	return;
 }
 
-int jacobiIsSteady(double** current_J, double** next_J, int row_size, int column_size, double epsila)
+int jacobiIsSteady(double** current_J, double** next_J, int row_size, int column_size, int extra_row_param, double epsila)
 {
+  if (extra_row_param == -1 || extra_row_param == 1)
+    row_size +=1;
+  else if (extra_row_param == 0)
+    row_size +=2;
+
 	for (int row = 1; row < row_size - 1; row++)
 	{
 		for (int column = 1; column < column_size - 1; column++) {
@@ -285,9 +326,17 @@ int main()
   	int skip = sendcounts[world_rank] - N; // for borders exchange
   	int row_size = sendcounts[world_rank] / (N + 2);
   	int column_size = N + 2;
+    int extra_row_param; //determine where border will added
 
-  	double** current_J = createAndInitSub(sub_J, row_size, column_size); //for two processes!
-  	double** next_J = createAndInitSub(sub_J, row_size, column_size); //for two processes!
+    if (world_rank == 0) //extra row will be added below
+      extra_row_param = -1;
+    else if (world_rank = world_size-1) //extra row will be added above
+      extra_row_param = 1;
+    else // both above and below extra rows are needed
+      extra_row_param = 0
+
+  	double** current_J = createAndInitSub(sub_J, row_size, column_size, extra_row_param); // it has one or two additional rows
+  	double** next_J = createAndInitSub(sub_J, row_size, column_size, extra_row_param); // it has one or two additional rows
 
   	do {
     // exchange borders
@@ -347,15 +396,15 @@ int main()
 
       //TODO Deal with row size
     	if (current_iter % 2 == 0) {
-    		calculateJacobi(current_J, next_J, row_size, column_size);
+    		calculateJacobi(current_J, next_J, row_size, column_size, extra_row_param);
     		// outputJacobi(next_J,row_size, column_size );
     	}
     	else {
-    		calculateJacobi(next_J, current_J, row_size, column_size);
+    		calculateJacobi(next_J, current_J, row_size, column_size, extra_row_param);
     		// outputJacobi(current_J,row_size, column_size);
     	}
 
-    	is_steady = jacobiIsSteady(current_J, next_J, row_size, column_size, epsila);
+    	is_steady = jacobiIsSteady(current_J, next_J, row_size, column_size, extra_row_param, epsila);
 
     	MPI_Reduce(&is_steady, &success_steady_root_check, 1, MPI_INT, MPI_SUM, 0, MPI_COMM_WORLD);
     	current_iter++;
@@ -366,13 +415,11 @@ int main()
     	MPI_Bcast(&must_continue, 1, MPI_INT, 0, MPI_COMM_WORLD);
 	} while (must_continue);
 
-  double* final_sub = create_1d_matrix(row_size*column_size); //for two processes!
-  if (current_iter % 2 == 0) {
-    transform_2d_to_1d(next_J, final_sub, row_size, column_size); //+1 for two processes only!
-  }
-  else {
-    transform_2d_to_1d(current_J, final_sub, row_size, column_size); //+1 for two processes only!
-  }
+
+  if (current_iter % 2 == 0)
+    double* final_sub = getFinalSub(next_J, row_size, column_size, extra_row_param);
+  else
+    double* final_sub = getFinalSub(current_J, row_size, column_size, extra_row_param);
 
   double* final_J = NULL;
   if (world_rank == 0) {

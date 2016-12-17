@@ -56,7 +56,7 @@ int main()
 
 
 	MPI_Init(NULL, NULL);
-	MPI_Barrier(MPI_COMM_WORLD);
+	// MPI_Barrier(MPI_COMM_WORLD);
 	int world_size;
 	MPI_Comm_size(MPI_COMM_WORLD, &world_size);
 	int world_rank;

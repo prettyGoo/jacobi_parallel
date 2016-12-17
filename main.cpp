@@ -284,26 +284,14 @@ void outputJacobi(double** J, int row_size, int column_size)
 int main()
 {
 	//remove(filename);
-	// int N;
-	// std::cout << "Input the number of rows and columns: ";
-	// std::cin >> N;
-	// int n_iters;
-	// std::cout << "Input the max value of iterations: ";
-	// std::cin >> n_iters;
-	// double epsila;
-	// std::cout << "Input precision of the calculation: ";
-	// std::cin >> epsila;
-	// double init_value;
-	// std::cout << "Input an ititial value: ";
-	// std::cin >> init_value;
+	int N;
+	int n_iters;
+	double epsila;
+	double init_value;
 	//auto t_1 = std::chrono::high_resolution_clock::now();
 
-	int N = 4;
-	int n_iters = 10;
-	double init_value = 1.0;
-	double epsila = 0.01;
-	int init_int_params[2] = {N, n_iters};
-	double init_double_params[2] = {init_value, epsila};
+	int init_int_params[2];
+	double init_double_params[2];
 
 	int rows_per_process;
 
@@ -324,6 +312,19 @@ int main()
 	int world_rank;
 	MPI_Comm_rank(MPI_COMM_WORLD, &world_rank);
 
+	if (world_rank == 0) {
+		std::cout << "Input the number of rows and columns: ";
+		std::cin >> N;
+		std::cout << "Input the max value of iterations: ";
+		std::cin >> n_iters;
+		init_int_params[0] = N; init_int_params[1] = n_iters;
+
+		std::cout << "Input precision of the calculation: ";
+		std::cin >> epsila;
+		std::cout << "Input an ititial value: ";
+		std::cin >> init_value;
+		init_double_params[0] = init_value; init_double_params[1] = epsila;
+	}
 	MPI_Bcast(&init_int_params, 2, MPI_INT, 0, MPI_COMM_WORLD);
 	MPI_Bcast(&init_double_params, 2, MPI_DOUBLE, 0, MPI_COMM_WORLD);
 
@@ -340,9 +341,13 @@ int main()
 
   // calculate send counts and displacements for the main matrix splitting
 	for (int i = 0; i < world_size; i++) {
-		sendcounts[i] = (rows_per_process + 1) * (N + 2);
+		if (world_rank == 0 || world_rank == world_size-1)
+			sendcounts[i] = (rows_per_process + 1) * (N + 2); //TODO: check if it works with more than two processes
+		else
+			sendcounts[i] = rows_per_process * (N + 2);
+			
 		if (last_rows > 0) {
-			sendcounts[i] += N;
+			sendcounts[i] += (N+2);
 			last_rows--;
 		}
 

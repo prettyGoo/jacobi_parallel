@@ -85,30 +85,23 @@ double* createAndInit(int row_size, int column_size, double init_value)
 
 	int index = 0;
 
-	for(int i = 0; i < row_size; i++)
-	{
-		if (i == 0) //the upper border
-		{
-			for(int j = 0; j < row_size; j++)
-			{
+	for(int i = 0; i < row_size; i++) {
+		if (i == 0) { //the upper border
+			for(int j = 0; j < row_size; j++) {
 				J[index] = init_value;
 				index++;
 			}
 		}
-		else if(i == row_size - 1) //the lower border
-		{
-			for(int j = 0; j < row_size; j++)
-			{
+		else if(i == row_size - 1) { //the lower border
+			for(int j = 0; j < row_size; j++) {
 				J[index] = init_value;
 				index++;
 			}
 		}
-		else
-		{
+		else {
 			J[index] = init_value;
 			index++;
-			for(int j = 0; j < row_size - 2; j++)
-			{
+			for(int j = 0; j < row_size - 2; j++) {
 				J[index] = 0;
 				index++;
 			}
@@ -120,43 +113,96 @@ double* createAndInit(int row_size, int column_size, double init_value)
 	return  J;
 }
 
-double** createAndInitSub(double* sub_J_1d, int row_size, int column_size, extra_row_param)
+double** createAndInitSub(double* sub_J_1d, int row_size, int column_size, int extra_row_param)
 {
   int rows;
-  if (extra_row_param == -1 || extra_row_param == 1) {
-    double** sub_J = create_2d_matrix(row_size+1, column_size);
+	double** sub_J;
+  if (extra_row_param == -1 || extra_row_param == 1) { //need one extra border
+    sub_J = create_2d_matrix(row_size+1, column_size);
     rows = row_size + 1;
   }
-  else if (extra_row_param == 0){
-    double** sub_J = create_2d_matrix(row_size+2, column_size);
+  else if (extra_row_param == 0){ //need two extra borders
+    sub_J = create_2d_matrix(row_size+2, column_size);
     rows = row_size + 2;
   }
 
 
   double** sub_J_2d = create_2d_matrix(row_size, column_size);
-	transform_1d_to_2d(sub_J_1d, sub_J_2d, row_size, column_size);
+	transform_1d_to_2d(sub_J_1d, sub_J_2d, row_size, column_size); //1d to 2d without borders
 
   int sub_i=0; int sub_j=0;
   for (int i=0; i<rows; i++) {
-    if (sub_j == column_size-1) {
+    if (sub_j == column_size) {
       sub_i++;
       sub_j = 0;
     }
     for (int j=0; j<column_size; j++) {
-      if (i==0 && (extra_row_param==1 || extra_row_param=0)) {
-        sub_J[i][j] = 0; // just nothins for now
-      }
-      else if (i==rows-1 && (extra_row_param==-1 || extra_row_param==0)) {
-        sub_J[i][j] = 0; // just nothing for now
+      if ((i==0 && (extra_row_param==1 || extra_row_param==0)) || (i==rows-1 && (extra_row_param==-1 || extra_row_param==0))) {
+				if (j==0 || j==column_size-1)
+        	sub_J[i][j] = 1; // just nothins for now
+				else
+					sub_J[i][j] = 0;
       }
       else {
-        sub_J = sub_J_2[i][j];
+        sub_J[i][j] = sub_J_2d[sub_i][sub_j];
         sub_j++;
       }
     }
   }
 
-	return sub_J;
+	// if (extra_row_param == -1) {
+	// 	for (int row = 0; row < row_size+1; row++)
+	// 	{
+	// 		for (int column = 0; column < column_size; column++)
+	// 			if (column == 0)
+	// 				cout << left << setw(10) << setprecision(5) << sub_J[row][column];
+	// 			else if (column == column_size - 1)
+	// 				cout << left << setprecision(5) << sub_J[row][column];
+	// 			else
+	// 				cout << left << setw(10) << setprecision(5) << sub_J[row][column];
+	// 		cout << endl;
+	// 	}
+	// 	cout << "Extra row " << extra_row_param << "" << endl;
+  // }
+  // else if (extra_row_param == 0){
+	// 	for (int row = 0; row < row_size+2; row++)
+	// 	{
+	// 		for (int column = 0; column < column_size; column++)
+	// 			if (column == 0)
+	// 				cout << left << setw(10) << setprecision(5) << sub_J[row][column];
+	// 			else if (column == column_size - 1)
+	// 				cout << left << setprecision(5) << sub_J[row][column];
+	// 			else
+	// 				cout << left << setw(10) << setprecision(5) << sub_J[row][column];
+	// 		cout << endl;
+	// 	}
+	// 	cout << "Extra row " << extra_row_param << "" << endl;
+  // }
+	return sub_J; //subJ with borders
+}
+
+double* getFinalSub(double** J, int row_size, int column_size, int extra_row_param)
+{//transforms 2d matrix to 1d and remove borders
+
+	int rows;
+	double* final_J_1d = create_1d_matrix(row_size*column_size);
+	double** final_J_2d = create_2d_matrix(row_size, column_size);
+
+	int index_tuner;
+  if (extra_row_param == -1) // the bottom border must be removed
+		index_tuner = 0;
+	else if (extra_row_param == 1 || extra_row_param == 0) //remove top border
+		index_tuner = 1;
+
+
+	for (int i=0; i<row_size; i++) {
+		for (int j=0; j<column_size; j++) {
+			final_J_2d[i][j] = J[i+index_tuner][j];
+		}
+	}
+
+	transform_2d_to_1d(final_J_2d, final_J_1d, row_size, column_size);
+	return final_J_1d;
 }
 
 void calculateJacobi(double** current_J, double** next_J, int row_size, int column_size, int extra_row_param)
@@ -280,7 +326,7 @@ int main()
 
 	MPI_Bcast(&init_int_params, 2, MPI_INT, 0, MPI_COMM_WORLD);
 	MPI_Bcast(&init_double_params, 2, MPI_DOUBLE, 0, MPI_COMM_WORLD);
-  //TODO separate function for init params
+
 	N = init_int_params[0];
 	n_iters = init_int_params[1];
 	init_value = init_double_params[0];
@@ -289,9 +335,9 @@ int main()
 	rows_per_process = N / world_size;
 	last_rows = N % world_size;
 
-  //TODO separate function
 	sendcounts = new int[world_size];
 	displs = new int[world_size];
+
   // calculate send counts and displacements for the main matrix splitting
 	for (int i = 0; i < world_size; i++) {
 		sendcounts[i] = (rows_per_process + 1) * (N + 2);
@@ -311,21 +357,21 @@ int main()
 	exchange_buffer_four = new double[N];
 
 
-	  double* J = NULL;
-  	int success_steady_root_check; // 1 for true, 0 for false
-  	int current_iter = 0;
+  double* J = NULL;
+	int success_steady_root_check; // 1 for true, 0 for false
+	int current_iter = 0;
 
-  	if (world_rank == 0) {
-  		J = createAndInit(N + 2, N + 2, 1);
-  		success_steady_root_check = 0;
-  	}
+	if (world_rank == 0) {
+		J = createAndInit(N + 2, N + 2, 1); //1 = init value
+		success_steady_root_check = 0;
+	}
 
   	MPI_Scatterv(J, sendcounts, displs, MPI_DOUBLE, sub_J, sendcounts[world_rank], MPI_DOUBLE, 0, MPI_COMM_WORLD);
   	int must_continue = 1;
   	int is_steady; // 0 means steady
   	int skip = sendcounts[world_rank] - N; // for borders exchange
-  	int row_size = sendcounts[world_rank] / (N + 2);
-  	int column_size = N + 2;
+		int column_size = N + 2;
+  	int row_size = sendcounts[world_rank] / column_size;
     int extra_row_param; //determine where border will added
 
     if (world_rank == 0) //extra row will be added below
@@ -333,7 +379,7 @@ int main()
     else if (world_rank = world_size-1) //extra row will be added above
       extra_row_param = 1;
     else // both above and below extra rows are needed
-      extra_row_param = 0
+      extra_row_param = 0;
 
   	double** current_J = createAndInitSub(sub_J, row_size, column_size, extra_row_param); // it has one or two additional rows
   	double** next_J = createAndInitSub(sub_J, row_size, column_size, extra_row_param); // it has one or two additional rows
@@ -415,11 +461,11 @@ int main()
     	MPI_Bcast(&must_continue, 1, MPI_INT, 0, MPI_COMM_WORLD);
 	} while (must_continue);
 
-
+	double* final_sub;
   if (current_iter % 2 == 0)
-    double* final_sub = getFinalSub(next_J, row_size, column_size, extra_row_param);
+    final_sub = getFinalSub(next_J, row_size, column_size, extra_row_param);
   else
-    double* final_sub = getFinalSub(current_J, row_size, column_size, extra_row_param);
+    final_sub = getFinalSub(current_J, row_size, column_size, extra_row_param);
 
   double* final_J = NULL;
   if (world_rank == 0) {
@@ -437,7 +483,6 @@ int main()
   }
 
 	MPI_Finalize();
-	//cout << "Number of iterations: " << iterations << endl;
 	//auto t_2 = std::chrono::high_resolution_clock::now();
 	//std::cout << "Total time: " << std::chrono::duration<double, std::milli>(t_2 - t_1).count() << " ms " << std::endl;
 

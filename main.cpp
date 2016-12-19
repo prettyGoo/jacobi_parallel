@@ -3,6 +3,7 @@
 #include <fstream>
 #include <iomanip>
 #include <cmath>
+#include <chrono>
 #include <mpi.h>
 
 
@@ -150,34 +151,7 @@ double** createAndInitSub(double* sub_J_1d, int row_size, int column_size, int e
     }
   }
 
-	// if (extra_row_param == -1) {
-	// 	for (int row = 0; row < row_size+1; row++)
-	// 	{
-	// 		for (int column = 0; column < column_size; column++)
-	// 			if (column == 0)
-	// 				cout << left << setw(10) << setprecision(5) << sub_J[row][column];
-	// 			else if (column == column_size - 1)
-	// 				cout << left << setprecision(5) << sub_J[row][column];
-	// 			else
-	// 				cout << left << setw(10) << setprecision(5) << sub_J[row][column];
-	// 		cout << endl;
-	// 	}
-	// 	cout << "Extra row " << extra_row_param << "" << endl;
-  // }
-  // else if (extra_row_param == 0){
-	// 	for (int row = 0; row < row_size+2; row++)
-	// 	{
-	// 		for (int column = 0; column < column_size; column++)
-	// 			if (column == 0)
-	// 				cout << left << setw(10) << setprecision(5) << sub_J[row][column];
-	// 			else if (column == column_size - 1)
-	// 				cout << left << setprecision(5) << sub_J[row][column];
-	// 			else
-	// 				cout << left << setw(10) << setprecision(5) << sub_J[row][column];
-	// 		cout << endl;
-	// 	}
-	// 	cout << "Extra row " << extra_row_param << "" << endl;
-  // }
+
 	return sub_J; //subJ with borders
 }
 
@@ -257,29 +231,29 @@ void outputJacobi(double** J, int row_size, int column_size)
 	cout << endl;
 }
 
-// void fileOutputJacobi(char* name, double** J, int N) {
-// 	ofstream outputFile;
-// 	outputFile.open(filename, ios::app);
-//
-// 	N += 2;
-//
-// 	outputFile << name << endl;
-//
-// 	for (int row = 0; row < N; row++)
-// 	{
-// 		for (int column = 0; column < N; column++)
-// 			if (column == 0)
-// 				outputFile << left << setw(12) << setprecision(5) << J[row][column];
-// 			else if (column == N - 1)
-// 				outputFile << left << setprecision(5) << J[row][column];
-// 			else
-// 				outputFile << left << setw(12) << setprecision(5) << J[row][column];
-// 		outputFile << endl;
-// 	}
-// 	outputFile << endl;
-//
-// 	outputFile.close();
-// }
+void fileOutputJacobi(char* name, double** J, int N) {
+	ofstream outputFile;
+	outputFile.open(filename, ios::app);
+
+	N += 2;
+
+	outputFile << name << endl;
+
+	for (int row = 0; row < N; row++)
+	{
+		for (int column = 0; column < N; column++)
+			if (column == 0)
+				outputFile << left << setw(12) << setprecision(5) << J[row][column];
+			else if (column == N - 1)
+				outputFile << left << setprecision(5) << J[row][column];
+			else
+				outputFile << left << setw(12) << setprecision(5) << J[row][column];
+		outputFile << endl;
+	}
+	outputFile << endl;
+
+	outputFile.close();
+}
 
 int main()
 {
@@ -288,10 +262,11 @@ int main()
 	int n_iters;
 	double epsila;
 	double init_value;
-	//auto t_1 = std::chrono::high_resolution_clock::now();
-
 	int init_int_params[2];
 	double init_double_params[2];
+
+	std::chrono::high_resolution_clock::time_point t_1;
+	std::chrono::high_resolution_clock::time_point t_2;
 
 	int rows_per_process;
 
@@ -324,6 +299,8 @@ int main()
 		std::cout << "Input an ititial value: ";
 		std::cin >> init_value;
 		init_double_params[0] = init_value; init_double_params[1] = epsila;
+
+		t_1 =  std::chrono::high_resolution_clock::now();
 	}
 	MPI_Bcast(&init_int_params, 2, MPI_INT, 0, MPI_COMM_WORLD);
 	MPI_Bcast(&init_double_params, 2, MPI_DOUBLE, 0, MPI_COMM_WORLD);
@@ -345,7 +322,7 @@ int main()
 			sendcounts[i] = (rows_per_process + 1) * (N + 2); //TODO: check if it works with more than two processes
 		else
 			sendcounts[i] = rows_per_process * (N + 2);
-			
+
 		if (last_rows > 0) {
 			sendcounts[i] += (N+2);
 			last_rows--;
@@ -390,60 +367,79 @@ int main()
   	double** next_J = createAndInitSub(sub_J, row_size, column_size, extra_row_param); // it has one or two additional rows
 
   	do {
-    // exchange borders
-    // if (world_rank % 2 == 0) {
-    //   for (int i=0; i<N; i++) {
-    //       exchange_buffer_one[i] = sub_J[i+skip];
-    //       exchange_buffer_two[i] = sub_J[i+skip];
-    //       exchange_buffer_three[i] = sub_J[i];
-    //       exchange_buffer_four[i] = sub_J[i];
-    //   }
-    //   if (world_rank == 0) { //send and receive once for first sub_J
-    //     MPI_Send(exchange_buffer_one, N, MPI_DOUBLE, world_rank+1, 0, MPI_COMM_WORLD);
-    //     MPI_Recv(exchange_buffer_two, N, MPI_DOUBLE, world_rank+1, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-    //     for (int i=0; i<N; i++) {
-    //         sub_J[i+skip] = exchange_buffer_two[i];
-    //     }
-    //   }
-    //   else if (world_rank == world_size-1) {//send and receive once for last sub_J
-    //     MPI_Send(exchange_buffer_four, N, MPI_DOUBLE, world_rank-1, 0, MPI_COMM_WORLD);
-    //     MPI_Recv(exchange_buffer_three, N, MPI_DOUBLE, world_rank-1, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-    //     for (int i=0; i<N; i++) {
-    //         sub_J[i] = exchange_buffer_three[i];
-    //     }
-    //   }
-    //   else { //send and receive twice
-    //     MPI_Send(exchange_buffer_four, N, MPI_DOUBLE, world_rank-1, 0, MPI_COMM_WORLD);
-    //     MPI_Recv(exchange_buffer_three, N, MPI_DOUBLE, world_rank-1, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-    //     MPI_Send(exchange_buffer_one, N, MPI_DOUBLE, world_rank+1, 0, MPI_COMM_WORLD);
-    //     MPI_Recv(exchange_buffer_two, N, MPI_DOUBLE, world_rank+1, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-    //     for (int i=0; i<N; i++) {
-    //         sub_J[i] = exchange_buffer_three[i];
-    //         sub_J[i+skip] = exchange_buffer_two[i];
-    //     }
-    //   }
-    // }
-    // else if (world_rank % 2 != 0 ) {
-    //   for (int i=0; i<N; i++) {
-    //       exchange_buffer_one[i] = sub_J[i];
-    //       exchange_buffer_two[i] = sub_J[i];
-    //       exchange_buffer_three[i] = sub_J[i+skip];
-    //       exchange_buffer_four[i] = sub_J[i+skip];
-    //   }
-    //
-    //   MPI_Send(exchange_buffer_two, N, MPI_DOUBLE, world_rank-1, 0, MPI_COMM_WORLD);
-    //   MPI_Recv(exchange_buffer_one, N, MPI_DOUBLE, world_rank-1, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-    //   for (int i=0; i<N; i++) {
-    //       sub_J[i] = exchange_buffer_one[i];
-    //   }
-    //   if (world_rank != world_size-1) {
-    //     MPI_Send(exchange_buffer_three, N, MPI_DOUBLE, world_rank+1, 0, MPI_COMM_WORLD);
-    //     MPI_Recv(exchange_buffer_four, N, MPI_DOUBLE, world_rank+1, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-    //     for (int i=0; i<N; i++) {
-    //         sub_J[i+skip] = exchange_buffer_four[i];
-    //     }
-    //   }
-    // }
+
+			if (world_rank == 0) {
+				if (current_iter % 2 == 0) {
+					for (int i=1; i<column_size-1; i++)
+							exchange_buffer_one[i-1] = current_J[row_size-1][i];
+				}
+				else if (current_iter % 2 != 0) {
+					for (int i=1; i<column_size-1; i++)
+							exchange_buffer_one[i-1] = next_J[row_size-1][i];
+				}
+				MPI_Send(exchange_buffer_one, N, MPI_DOUBLE, world_rank+1, 0, MPI_COMM_WORLD);
+				MPI_Recv(exchange_buffer_two, N, MPI_DOUBLE, world_rank+1, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+				if (current_iter % 2 == 0) {
+					for (int i=1; i<column_size-1; i++)
+							current_J[row_size][i] = exchange_buffer_two[i-1];
+				}
+				else if (current_iter % 2 != 0) {
+					for (int i=1; i<column_size-1; i++)
+							next_J[row_size][i] = exchange_buffer_two[i-1];
+				}
+			}
+			else if (world_rank == world_size-1) {//send and receive once for last sub_J
+				if (current_iter % 2 == 0) {
+					for (int i=1; i<column_size-1; i++)
+							exchange_buffer_three[i-1] = current_J[1][i];
+				}
+				else if (current_iter % 2 != 0) {
+					for (int i=1; i<column_size-1; i++)
+							exchange_buffer_three[i-1] = next_J[1][i];
+				}
+				MPI_Send(exchange_buffer_three, N, MPI_DOUBLE, world_rank-1, 0, MPI_COMM_WORLD);
+				MPI_Recv(exchange_buffer_four, N, MPI_DOUBLE, world_rank-1, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+				if (current_iter % 2 == 0) {
+					for (int i=1; i<column_size-1; i++)
+							current_J[0][i] = exchange_buffer_four[i-1];
+				}
+				else if (current_iter % 2 != 0) {
+					for (int i=1; i<column_size-1; i++)
+							next_J[0][i] = exchange_buffer_four[i-1];
+				}
+			}
+			else {
+				if (current_iter % 2 == 0) {
+					for (int i=1; i<column_size-1; i++) {
+						exchange_buffer_one[i-1] = current_J[row_size-1][i];
+						exchange_buffer_three[i-1] = current_J[1][i];
+					}
+				}
+				else if (current_iter % 2 != 0) {
+					for (int i=1; i<column_size-1; i++) {
+						exchange_buffer_one[i-1] = next_J[row_size-1][i];
+						exchange_buffer_three[i-1] = next_J[1][i];
+					}
+				}
+
+				MPI_Send(exchange_buffer_one, N, MPI_DOUBLE, world_rank+1, 0, MPI_COMM_WORLD);
+				MPI_Recv(exchange_buffer_two, N, MPI_DOUBLE, world_rank+1, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+				MPI_Send(exchange_buffer_three, N, MPI_DOUBLE, world_rank-1, 0, MPI_COMM_WORLD);
+				MPI_Recv(exchange_buffer_four, N, MPI_DOUBLE, world_rank-1, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+
+				if (current_iter % 2 == 0) {
+					for (int i=1; i<column_size-1; i++) {
+						current_J[row_size][i] = exchange_buffer_two[i-1];
+						current_J[0][i] = exchange_buffer_four[i-1];
+					}
+				}
+				else if (current_iter % 2 != 0) {
+					for (int i=1; i<column_size-1; i++) {
+						next_J[row_size][i] = exchange_buffer_two[i-1];
+						next_J[0][i] = exchange_buffer_four[i-1];
+					}
+				}
+			}
 
       //TODO Deal with row size
     	if (current_iter % 2 == 0) {
@@ -485,11 +481,13 @@ int main()
     transform_1d_to_2d(final_J, result, N+2, N+2);
     outputJacobi(result, N+2, N+2);
     std::cout << "Iterations: " << current_iter << "\n";
+
+		t_2 = std::chrono::high_resolution_clock::now();
+		std::cout << "Total time: " << std::chrono::duration<double, std::milli>(t_2 - t_1).count() << " ms " << std::endl;
   }
 
 	MPI_Finalize();
-	//auto t_2 = std::chrono::high_resolution_clock::now();
-	//std::cout << "Total time: " << std::chrono::duration<double, std::milli>(t_2 - t_1).count() << " ms " << std::endl;
+
 
 	return 0;
 }
